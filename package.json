@@ -1,0 +1,19 @@
+{
+  "name": "acadmate-lambda",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "@types/node": "^22.13.14",
+    "axios": "^1.8.4",
+    "cheerio": "^1.0.0",
+    "mongoose": "^8.13.1",
+    "typescript": "^5.8.2"
+  }
+}
