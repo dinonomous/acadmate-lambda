@@ -1,8 +1,7 @@
-import axios from "axios";
 import * as cheerio from "cheerio";
 import { Cheerio } from "cheerio";
-import { Types } from "mongoose";
-import { User } from "../models/user.model";
+import { getUserCollection } from "../models/user.model";
+import { ObjectId } from "mongodb";
 
 interface ResponseData {
   user: Array<{ [key: string]: string }>;
@@ -47,7 +46,7 @@ function extractTextBetweenWords(
 }
 
 export async function updateTimetable(
-  userId: string | Types.ObjectId,
+  userId: string | ObjectId,
   cookies: string
 ) {
   try {
@@ -55,21 +54,23 @@ export async function updateTimetable(
       console.error("Unauthorized: user id not provided");
       return;
     }
-    const timetableResponse = await axios.get(
+    const timetableResponse = await fetch(
       `https://academia.srmist.edu.in/srm_university/academia-academic-services/page/My_Time_Table_2023_24`,
       {
-        headers: {
+        headers: new Headers({
           Accept: "*/*",
           Cookie: cookies,
           Host: "academia.srmist.edu.in",
           Origin: "https://academia.srmist.edu.in",
           Referer: "https://academia.srmist.edu.in/",
-        },
+        }),
+        redirect: "follow"
       }
     );
 
-    if (timetableResponse.status === 200 && timetableResponse.data) {
-      const decodedHTML = decodeEncodedString(timetableResponse.data);
+    if (timetableResponse.status === 200) {
+      const responseText = await timetableResponse.text()
+      const decodedHTML = decodeEncodedString(responseText);
       const result = extractTextBetweenWords(
         decodedHTML,
         "</style>\n",
@@ -154,14 +155,15 @@ export async function updateTimetable(
               });
             }
           });
-          await User.findByIdAndUpdate(
-            userId,
+
+          const usersCollection = await getUserCollection();
+          await usersCollection.updateOne(
+            { _id: typeof userId === "string" ? new ObjectId(userId) : userId },
             {
               $set: {
                 batch: response.user.find((u) => u.Batch)?.Batch,
               },
             },
-            { new: true }
           );
 
           response.timetable = timetableData;

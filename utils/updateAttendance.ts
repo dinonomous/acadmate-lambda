@@ -1,8 +1,6 @@
-import axios from "axios";
 import * as cheerio from "cheerio";
-import { User } from "../models/user.model";
-import { Types } from "mongoose";
-// import { findDiff } from "./logCatcher";
+import { getUserCollection } from "../models/user.model";
+import { ObjectId } from "mongodb";
 
 interface ResponseData {
   user: Array<{ [key: string]: string }>;
@@ -32,34 +30,38 @@ function extractTextBetweenWords(
 }
 
 export const updateAttendance = async (
-  userId: string | Types.ObjectId,
+  userId: string | ObjectId,
   cookies: string,
-  att: { attendance: []; marks: [] }
+  att: ResponseData
 ): Promise<void> => {
   try {
     if (!userId) {
       console.error("Unauthorized: user id not provided");
       return;
     }
-    const user = await User.findById(userId);
+    const usersCollection = await getUserCollection();
+    const user = await usersCollection.findOne({ _id: typeof userId === "string" ? new ObjectId(userId) : userId });
     if (!user) {
       console.error("User not found for id:", userId);
       return;
     }
-    const attendanceResponse = await axios.get(
+    const attendanceResponse = await fetch(
       "https://academia.srmist.edu.in/srm_university/academia-academic-services/page/My_Attendance",
       {
-        headers: {
-          Accept: "*/*",
-          Cookie: cookies,
-          Host: "academia.srmist.edu.in",
-          Origin: "https://academia.srmist.edu.in",
-          Referer: "https://academia.srmist.edu.in/",
-        },
+        method: "GET",
+        headers: new Headers({
+          "Accept": "*/*",
+          "Cookie": cookies,
+          "Host": "academia.srmist.edu.in",
+          "Origin": "https://academia.srmist.edu.in",
+          "Referer": "https://academia.srmist.edu.in/",
+        }),
+        redirect: "follow"
       }
     );
-    if (attendanceResponse.status === 200 && attendanceResponse.data) {
-      const decodedHTML = decodeEncodedString(attendanceResponse.data);
+    if (attendanceResponse.status === 200) {
+      const responseText = await attendanceResponse.text();
+      const decodedHTML = decodeEncodedString(responseText);
       const result = extractTextBetweenWords(
         decodedHTML,
         "</style>\n",
@@ -147,11 +149,9 @@ export const updateAttendance = async (
         }
 
         if (JSON.stringify(responseData) != JSON.stringify(att)) {
-          // console.log("Att change triggered");
-          await User.findByIdAndUpdate(
-            userId,
-            { $set: { att: responseData } },
-            { new: true }
+          await usersCollection.updateOne(
+            { _id: typeof userId === "string" ? new ObjectId(userId) : userId },
+            { $set: { att: responseData } }
           );
           // if (
           //   att?.attendance?.length != 0 ||
@@ -162,17 +162,15 @@ export const updateAttendance = async (
           // }
         }
       } else {
-        await User.findByIdAndUpdate(
-          userId,
-          { $set: { att: {} } },
-          { new: true }
+        await usersCollection.updateOne(
+          { _id: typeof userId === "string" ? new ObjectId(userId) : userId },
+          { $set: { att: att } }
         );
       }
     } else {
-      await User.findByIdAndUpdate(
-        userId,
-        { $set: { att: {} } },
-        { new: true }
+      await usersCollection.updateOne(
+        { _id: typeof userId === "string" ? new ObjectId(userId) : userId },
+        { $set: { att: att } }
       );
     }
   } catch (err: any) {

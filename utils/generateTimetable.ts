@@ -1,5 +1,5 @@
-import { User } from "../models/user.model";
-import { Types } from "mongoose";
+import { getUserCollection } from "../models/user.model";
+import { ObjectId } from "mongodb";
 
 interface Course {
   Slot: string;
@@ -49,7 +49,7 @@ interface UserTimetableData {
 }
 
 export default async function generateAndStoreTimetable(
-  userId: string | Types.ObjectId,
+  userId: string | ObjectId,
   userData: UserTimetableData,
   weeklySchedule: WeeklySchedule[]
 ): Promise<DaySchedule[]> {
@@ -111,10 +111,10 @@ export default async function generateAndStoreTimetable(
       })
     );
 
-    await User.findByIdAndUpdate(
-      userId,
-      { $set: { timetable: generatedTimetable } },
-      { new: true, runValidators: true }
+    const usersCollection = await getUserCollection();
+    await usersCollection.updateOne(
+      { _id: typeof userId === "string" ? new ObjectId(userId) : userId },
+      { $set: { timetable: generatedTimetable } }
     );
 
     return generatedTimetable;

@@ -1,9 +1,14 @@
-import mongoose, { Document, Schema } from "mongoose";
+import { MongoClient, ObjectId } from "mongodb";
 
-export interface IUser extends Document {
+const MONGO_URI = "mongodb://adminUser:AcadmateAdminTeam%401@98.130.23.168:27017/AcadmateUsers?authSource=admin";
+const client = new MongoClient(MONGO_URI);
+let isConnected = false;
+
+export interface IUser {
+  _id?: ObjectId;
   email: string;
   cookies?: string;
-  att?: Record<string, any>;
+  att?: { user: any[]; attendance: any[]; marks: any[] };
   timetable?: any[];
   calendar?: Record<string, any>;
   do?: number;
@@ -13,20 +18,11 @@ export interface IUser extends Document {
   calendarLastUpdated?: Date;
 }
 
-const userSchema = new Schema<IUser>(
-  {
-    email: { type: String, required: true, trim: true, unique: true, index: true }, 
-    cookies: { type: String, default: "" },
-    att: { type: Object, required: false, default: {} },
-    timetable: { type: Array, required: false, default: [] },
-    calendar: { type: Object, default: {} },
-    do: { type: Number, default: 0 },
-    batch: { type: String, default: "", index: true },
-    logs: { type: Array, default: [] },
-    lastUpdated: { type: Date, default: Date.now, index: true },
-    calendarLastUpdated: { type: Date, default: Date.now, index: true },
-  },
-  { timestamps: true }
-);
-
-export const User = mongoose.model<IUser>("User", userSchema);
+export async function getUserCollection() {
+  if (!isConnected) {
+    await client.connect();
+    isConnected = true;
+    console.log("MongoDB Connected");
+  } 
+  return client.db("AcadmateUsers").collection<IUser>("users");
+}

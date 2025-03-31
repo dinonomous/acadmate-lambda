@@ -1,7 +1,6 @@
-import axios from "axios";
 import * as cheerio from "cheerio";
-import { User } from "../models/user.model";
-import { Types } from "mongoose";
+import { getUserCollection } from "../models/user.model";
+import { ObjectId } from "mongodb";
 
 interface TimeTableEntry {
   day: string;
@@ -33,7 +32,7 @@ function extractTextBetweenWords(
 }
 
 export const updateUnifiedtt = async (
-  userId: string | Types.ObjectId,
+  userId: string | ObjectId,
   cookies: string,
   batch: string
 ): Promise<TimeTableEntry[] | undefined> => {
@@ -53,18 +52,19 @@ export const updateUnifiedtt = async (
         "https://academia.srmist.edu.in/srm_university/academia-academic-services/page/Unified_Time_Table_2024_batch_2";
     }
 
-    const response = await axios.get(unifiedTimeTableUrl, {
-      headers: {
+    const response = await fetch(unifiedTimeTableUrl, {
+      headers: new Headers({
         Accept: "*/*",
         Cookie: cookies,
         Host: "academia.srmist.edu.in",
         Origin: "https://academia.srmist.edu.in",
         Referer: "https://academia.srmist.edu.in/",
-      },
+      }),
     });
 
-    if (response.status === 200 && response.data) {
-      const decodedHTML = decodeEncodedString(response.data);
+    if (response.status === 200) {
+      const responseText = await response.text();
+      const decodedHTML = decodeEncodedString(responseText);
       const extractedHTML = extractTextBetweenWords(
         decodedHTML,
         "</style>\n",

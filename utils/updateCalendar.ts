@@ -1,11 +1,10 @@
-import axios from "axios";
 import { decode } from "he";
 import * as cheerio from "cheerio";
-import { User } from "../models/user.model";
-import { Types } from "mongoose";
+import { getUserCollection } from "../models/user.model";
+import { ObjectId } from "mongodb";
 
 export const updateCalender = async (
-  userId: string | Types.ObjectId,
+  userId: string | ObjectId,
   cookies: string
 ) => {
   try {
@@ -13,28 +12,32 @@ export const updateCalender = async (
       console.error("Unauthorized: user id not provided");
       return;
     }
-    const user = await User.findById(userId);
+    const usersCollection = await getUserCollection();
+    const user = await usersCollection.findOne({ _id: typeof userId === "string" ? new ObjectId(userId) : userId })
     if (!user) {
       console.error("User not found for id:", userId);
       return;
     }
 
-    const timetableResponse = await axios.get(
+    const timetableResponse = await fetch(
       "https://academia.srmist.edu.in/srm_university/academia-academic-services/page/Academic_Planner_2024_25_EVEN",
       {
-        headers: {
+        method: "GET",
+        headers: new Headers({
           Accept:
             "text/html,application/xhtml+xml,application/xml;q=0.9,/;q=0.8",
           Cookie: cookies,
           Host: "academia.srmist.edu.in",
           Origin: "https://academia.srmist.edu.in",
           Referer: "https://academia.srmist.edu.in/",
-        },
+        }),
+        redirect: "follow"
       }
     );
 
-    if (timetableResponse.status === 200 && timetableResponse.data) {
-      const rawHtml = timetableResponse.data;
+    if (timetableResponse.status === 200) {
+      const responseText = await timetableResponse.text()
+      const rawHtml = responseText;
       const decodedHtml = decode(rawHtml);
       const $ = cheerio.load(decodedHtml);
 
@@ -90,14 +93,13 @@ export const updateCalender = async (
         }
       });
 
-      await User.findByIdAndUpdate(
-        userId,
+      await usersCollection.updateOne(
+        { _id: typeof userId === "string" ? new ObjectId(userId) : userId },
         {
           $set: {
             calendar: finalCalendar,
           },
         },
-        { new: true }
       );
     } else {
       return;
